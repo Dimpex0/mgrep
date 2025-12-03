@@ -162,7 +162,8 @@ if __name__ == "__main__":
     if not files:
         sys.exit("Couldn't get any of the given urls")
 
-    files = [file for file in os.listdir(os.curdir) if os.path.isfile(file)]
+    if recursive:
+        files = [file for file in os.listdir(os.curdir) if os.path.isfile(file)]
     # print(files)
     if not files:
         sys.exit("No files in the current directory")
