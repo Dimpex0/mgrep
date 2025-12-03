@@ -67,18 +67,17 @@ def search_in_file(pattern: re.Pattern, file_path: str, is_in_memory: bool = Fal
     if not os.path.exists(file_path):
         raise InvalidFileError
 
+    result = []
+
+    file = open(os.path.join(file_path))
     try:
-        (_, filename) = os.path.split(file_path)
-        result = []
         if is_in_memory:
-            file = open(os.path.join(file_path))
-            data = file.readlines()
+            data = file.read()
             file.close()
             for index, line in enumerate(data):
                 if re.search(pattern, line) is not None:
                     result.append((line.rstrip('\n'), file_path, index + 1))
         else:
-            file = open(os.path.join(file_path))
             line = file.readline()
             line_number = 1
             while line != '':
@@ -87,10 +86,15 @@ def search_in_file(pattern: re.Pattern, file_path: str, is_in_memory: bool = Fal
 
                 line = file.readline()
                 line_number += 1
+            file.close()
 
         return result
     except UnicodeDecodeError:
         print(f"Couldn't open file: {file_path} Unsupported encoding")
+    finally:
+        file.close()
+
+    return result
 
 
 def run_multi_threaded(pattern: re.Pattern, file_paths: list[str], is_in_memory: bool = False, is_line_numbers: bool = False, amount_of_workers: int = 0):
@@ -109,7 +113,7 @@ def run_multi_threaded(pattern: re.Pattern, file_paths: list[str], is_in_memory:
         args = [(pattern, file_path, is_in_memory) for file_path in files]
         results = pool.starmap(search_in_file, args)
 
-    return []
+    return results
 
 def save_url_to_temp(url):
 
@@ -143,42 +147,30 @@ if __name__ == "__main__":
     recursive: bool     = args.recursive
     from_url: bool      = args.from_url
 
-    # file = open(os.path.join("D:\\", "Projects", "text.txt"))
-    # data = file.read()
-    # file.close()
-    #
-    # for i in range(0, 100):
-    #     with open(os.path.join("D:\\", "Projects", f"text-{i}.txt"), "w") as f:
-    #         f.write(data)
-
-
     start = time.time()
-    if not files:
+    if not files and not recursive:
         sys.exit("No files provided")
 
     if from_url and not recursive:
         files = fetch_files_from_url(files)
-
-    if not files:
-        sys.exit("Couldn't get any of the given urls")
+        if not files:
+            sys.exit("Couldn't get any of the given urls")
 
     if recursive:
         files = [file for file in os.listdir(os.curdir) if os.path.isfile(file)]
-    # print(files)
+
     if not files:
         sys.exit("No files in the current directory")
 
     try:
         results = run_multi_threaded(pattern, files, in_memory, line_number, parallel)
-        end: float = time.time()
-        print(f"It took {(end - start):.2f} seconds")
+        results = [result_tuple for sublist in results for result_tuple in sublist]
 
-        # print(results)
-        # for line, filename, number in results:
-        #     if line_number:
-        #         print(f"{filename}:{number} - {line}")
-        #     else:
-        #         print(f"{line}")
+        for line, file_path, line_n in results:
+            if line_number:
+                print(f"{file_path}:{line_n} - {line}")
+            else:
+                print(line)
     finally:
          if TEMP_DIR.exists():
              shutil.rmtree(TEMP_DIR)
