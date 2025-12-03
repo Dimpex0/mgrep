@@ -3,7 +3,6 @@ import re
 import os
 import shutil
 import sys
-import time
 from argparse import Namespace
 from multiprocessing import Pool
 from pathlib import Path
@@ -147,7 +146,6 @@ if __name__ == "__main__":
     recursive: bool     = args.recursive
     from_url: bool      = args.from_url
 
-    start = time.time()
     if not files and not recursive:
         sys.exit("No files provided")
 
