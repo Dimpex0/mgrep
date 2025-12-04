@@ -1,2 +1,6 @@
 *.txt
+!requirements.txt
 .idea
+*.zip
+assets
+__pycache__

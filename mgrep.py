@@ -6,7 +6,6 @@ import sys
 from argparse import Namespace
 from multiprocessing import Pool
 from pathlib import Path
-
 import requests
 
 TEMP_DIR = Path("temp")
@@ -63,25 +62,29 @@ def setup_cli() -> Namespace:
 
 
 def search_in_file(pattern: re.Pattern, file_path: str, is_in_memory: bool = False) -> list[tuple]:
-    if not os.path.exists(file_path):
+    actual_path = os.path.normpath(file_path)
+
+    if not os.path.isabs(actual_path):
+        actual_path = os.path.join(os.getcwd(), actual_path.lstrip("/\\"))
+
+    if not os.path.exists(actual_path):
         raise InvalidFileError
 
     result = []
-
-    file = open(os.path.join(file_path))
+    file = open(actual_path)
     try:
         if is_in_memory:
             data = file.read()
             file.close()
-            for index, line in enumerate(data):
+            for index, line in enumerate(data.splitlines()):
                 if re.search(pattern, line) is not None:
-                    result.append((line.rstrip('\n'), file_path, index + 1))
+                    result.append((line, file_path, index + 1))
         else:
             line = file.readline()
             line_number = 1
             while line != '':
                 if re.search(pattern, line) is not None:
-                    result.append((line.rstrip('\n'), file_path, line_number))
+                    result.append((line, file_path, line_number))
 
                 line = file.readline()
                 line_number += 1
@@ -109,12 +112,12 @@ def run_multi_threaded(pattern: re.Pattern, file_paths: list[str], is_in_memory:
         return all_results
 
     with Pool(amount_of_workers) as pool:
-        args = [(pattern, file_path, is_in_memory) for file_path in files]
+        args = [(pattern, file_path, is_in_memory) for file_path in file_paths]
         results = pool.starmap(search_in_file, args)
 
     return results
 
-def save_url_to_temp(url):
+def save_url_to_temp(url) -> str | None:
 
     filename = TEMP_DIR / os.path.basename(url)
     try:
@@ -128,7 +131,7 @@ def save_url_to_temp(url):
     except Exception as e:
         print(f"Error when reading from {url}")
 
-def fetch_files_from_url(urls: list[str]):
+def fetch_files_from_url(urls: list[str]) -> list[str]:
     TEMP_DIR.mkdir(exist_ok=True)
 
     with Pool() as pool:
@@ -138,7 +141,7 @@ def fetch_files_from_url(urls: list[str]):
 
 if __name__ == "__main__":
     args: Namespace = setup_cli()
-    pattern: re.Pattern = args.pattern
+    pattern: re.Pattern = re.compile(args.pattern)
     files: list[str]    = args.files
     line_number: bool   = args.line_number
     in_memory: bool     = args.in_memory
@@ -163,7 +166,6 @@ if __name__ == "__main__":
     try:
         results = run_multi_threaded(pattern, files, in_memory, line_number, parallel)
         results = [result_tuple for sublist in results for result_tuple in sublist]
-
         for line, file_path, line_n in results:
             if line_number:
                 print(f"{file_path}:{line_n} - {line}")
